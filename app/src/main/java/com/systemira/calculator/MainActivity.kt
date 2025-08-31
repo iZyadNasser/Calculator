@@ -33,8 +33,8 @@ class MainActivity : AppCompatActivity() {
     private fun observeStates() {
         lifecycleScope.launch {
             viewModel.state.collect { state ->
-                binding.textLastOperation.text = state.lastOperation
-                binding.textResult.text = state.result
+                binding.textLastOperation.text = state.lastLine
+                binding.textResult.text = state.resultStr
             }
         }
     }
@@ -42,6 +42,18 @@ class MainActivity : AppCompatActivity() {
     private fun setupOnClickListeners() {
         setupOperationOnClickListeners()
         setupNumberOnClickListeners()
+        binding.buttonOperationAc.setOnClickListener {
+            viewModel.onClearAllClick()
+        }
+        binding.buttonOperationBack.setOnClickListener {
+            viewModel.onBackspaceClick()
+        }
+        binding.buttonOperationEqual.setOnClickListener {
+            viewModel.onEqualClick()
+        }
+        binding.buttonPositiveNegative.setOnClickListener {
+            viewModel.onNegationClick()
+        }
     }
 
     private fun setupNumberOnClickListeners() {
@@ -81,12 +93,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupOperationOnClickListeners() {
-        binding.buttonOperationAc.setOnClickListener {
-            viewModel.onOperationClick(Operation.CLEAR_ALL)
-        }
-        binding.buttonOperationBack.setOnClickListener {
-            viewModel.onOperationClick(Operation.BACKSPACE)
-        }
         binding.buttonOperationReminder.setOnClickListener {
             viewModel.onOperationClick(Operation.REMINDER)
         }
@@ -101,9 +107,6 @@ class MainActivity : AppCompatActivity() {
         }
         binding.buttonOperationSubtraction.setOnClickListener {
             viewModel.onOperationClick(Operation.SUBTRACTION)
-        }
-        binding.buttonOperationEqual.setOnClickListener {
-            viewModel.onOperationClick(Operation.EQUAL)
         }
     }
 }
