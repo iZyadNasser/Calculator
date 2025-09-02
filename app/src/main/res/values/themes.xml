@@ -17,6 +17,7 @@
         <item name="android:textSize">22sp</item>
         <item name="android:background">@drawable/button_background</item>
         <item name="android:gravity">center</item>
+        <item name="layout_constraintDimensionRatio">1:1</item>
     </style>
 
     <style name="Button.Operation">

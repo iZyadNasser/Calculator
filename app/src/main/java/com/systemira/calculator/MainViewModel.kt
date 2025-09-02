@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.util.Stack
 
-class MainViewModel: ViewModel(), CalculatorInteractionListener {
+class MainViewModel : ViewModel(), CalculatorInteractionListener {
     private val _state = MutableStateFlow(CalculatorState())
     val state = _state.asStateFlow()
 
@@ -16,6 +16,7 @@ class MainViewModel: ViewModel(), CalculatorInteractionListener {
 
     override fun onClearAllClick() {
         calculationStack.clear()
+        hasFloatingPoint = false
         _state.update {
             it.copy(
                 lastLine = "",
@@ -40,20 +41,34 @@ class MainViewModel: ViewModel(), CalculatorInteractionListener {
 
     private fun isLastEntryNumber(): Boolean {
         if (calculationStack.isEmpty()) return false
-        return calculationStack.peek().isSignedDigitsOnly()
+        if (calculationStack.size == 1 && calculationStack.peek().isSignedDigitsOnly()) return true
+        return calculationStack.peek().isDigitsOnly() || calculationStack.peek().isDecimalNumber()
     }
 
     private fun String.isSignedDigitsOnly(): Boolean {
+        if (this.isEmpty()) return false
         if (this.first() == '-') {
             return this.drop(1).isDigitsOnly()
         }
         return this.isDigitsOnly()
     }
 
+    private fun String.isDecimalNumber(): Boolean {
+        if (this.isEmpty()) return false
+        val withoutSign = if (this.startsWith("-")) this.drop(1) else this
+        if (!withoutSign.contains('.')) return false
+        val parts = withoutSign.split('.')
+        return parts.size == 2 && parts[0].isDigitsOnly() && parts[1].isDigitsOnly()
+    }
+
     private fun handleBackspaceNumber() {
         val number = calculationStack.pop()
-        if (number.dropLast(1).isNotEmpty()) {
-            calculationStack.push(number.dropLast(1))
+        val newNumber = number.dropLast(1)
+        if (newNumber.isNotEmpty() && newNumber != "-") {
+            calculationStack.push(newNumber)
+            hasFloatingPoint = newNumber.contains('.')
+        } else {
+            hasFloatingPoint = false
         }
     }
 
@@ -74,7 +89,7 @@ class MainViewModel: ViewModel(), CalculatorInteractionListener {
     override fun onNumberClick(digit: String) {
         if (isLastEntryNumber()) {
             handleAddNewDigitToExistingNumber(digit)
-        } else if (calculationStack.isEmpty()){
+        } else if (calculationStack.isEmpty()) {
             handleNewNumberInEmptyStack(digit)
         } else {
             handleNewNumber(digit)
@@ -96,7 +111,8 @@ class MainViewModel: ViewModel(), CalculatorInteractionListener {
 
     private fun isLastEntryMultiDigit(): Boolean {
         if (calculationStack.isEmpty()) return false
-        return calculationStack.peek().isDigitsOnly() && calculationStack.size > 1
+        val entry = calculationStack.peek()
+        return (entry.isSignedDigitsOnly() || entry.isDecimalNumber()) && entry.length > 1
     }
 
     private fun isLastEntryZero(): Boolean {
@@ -127,8 +143,9 @@ class MainViewModel: ViewModel(), CalculatorInteractionListener {
     }
 
     override fun onOperationClick(operation: Operation) {
-        if (isLastEntryNumber()) {
+        if (calculationStack.isNotEmpty() && isLastEntryNumber()) {
             calculationStack.push(operation.asString())
+            hasFloatingPoint = false
         }
         updateCurrentLine()
     }
@@ -157,58 +174,165 @@ class MainViewModel: ViewModel(), CalculatorInteractionListener {
     }
 
     override fun onEqualClick() {
-//        TODO("Not yet implemented")
-        updateLastLine()
-        updateCurrentLine()
-        calculationStack.clear()
-    }
+        if (isValidStack()) {
+            updateLastLine()
+            val originalStack = Stack<String>()
+            calculationStack.forEach { originalStack.push(it) }
 
-    private fun handleOperation(operation: Operation) {
-        when (operation) {
-            Operation.REMINDER -> {
-                handleReminder()
-            }
+            evaluateStack()
+            val result = state.value.currentLine
 
-            Operation.DIVISION -> {
-                handleDivision()
-            }
+            calculationStack.clear()
+            hasFloatingPoint = false
 
-            Operation.MULTIPLICATION -> {
-                handleMultiplication()
-            }
-
-            Operation.ADDITION -> {
-                handleAddition()
-            }
-
-            Operation.SUBTRACTION -> {
-                handleSubtraction()
+            if (result != ERROR && result.isNotEmpty() && result != "0") {
+                calculationStack.push(result)
+                if (result.contains(".")) {
+                    hasFloatingPoint = true
+                }
+                updateCurrentLine()
             }
         }
     }
 
-    private fun handleReminder() {
-//         TODO("Not yet implemented")
+    private fun isValidStack(): Boolean {
+        if (calculationStack.isEmpty()) return true
+        return calculationStack.peek().isOperation().not()
     }
 
-    private fun handleDivision() {
-//         TODO("Not yet implemented")
+    private fun evaluateStack() {
+        _state.update {
+            it.copy(
+                currentLine = calculate()
+            )
+        }
     }
 
-    private fun handleMultiplication() {
-//         TODO("Not yet implemented")
+    private fun calculate(): String {
+        if (calculationStack.isEmpty()) {
+            return "0"
+        }
+
+        try {
+            val expression = buildExpressionFromStack()
+            return evaluateExpression(expression)
+        } catch (_: Exception) {
+            return ERROR
+        }
     }
 
-    private fun handleAddition() {
-//         TODO("Not yet implemented")
+    private fun buildExpressionFromStack(): String {
+        val stackItems = mutableListOf<String>()
+        val tempStack = Stack<String>()
+
+        while (calculationStack.isNotEmpty()) {
+            tempStack.push(calculationStack.pop())
+        }
+        while (tempStack.isNotEmpty()) {
+            stackItems.add(tempStack.pop())
+        }
+
+        var expression = ""
+        var currentNumber = ""
+
+        for (item in stackItems) {
+            when {
+                item.isOperation() -> {
+                    if (currentNumber.isNotEmpty()) {
+                        expression += currentNumber
+                        currentNumber = ""
+                    }
+                    expression += " $item "
+                }
+                item == "." -> {
+                    currentNumber += item
+                }
+                else -> {
+                    currentNumber += item
+                }
+            }
+        }
+
+        if (currentNumber.isNotEmpty()) {
+            expression += currentNumber
+        }
+
+        return expression.trim()
     }
 
-    private fun handleSubtraction() {
-//         TODO("Not yet implemented")
+    private fun evaluateExpression(expression: String): String {
+        if (expression.isEmpty()) return "0"
+
+        val parts = expression.split(" ").filter { it.isNotEmpty() }
+        if (parts.size == 1) {
+            return formatResult(parts[0].toDoubleOrNull() ?: 0.0)
+        }
+
+        val numbers = mutableListOf<Double>()
+        val operations = mutableListOf<String>()
+
+        for (i in parts.indices) {
+            if (i % 2 == 0) {
+                numbers.add(parts[i].toDoubleOrNull() ?: return ERROR)
+            } else {
+                operations.add(parts[i])
+            }
+        }
+
+        var i = 0
+        while (i < operations.size) {
+            val op = operations[i]
+            if (op == "x" || op == "/" || op == "%") {
+                val left = numbers[i]
+                val right = numbers[i + 1]
+
+                val result = when (op) {
+                    "x" -> left * right
+                    "/" -> {
+                        if (right == 0.0) return ERROR
+                        left / right
+                    }
+                    "%" -> {
+                        if (right == 0.0) return ERROR
+                        left % right
+                    }
+                    else -> return ERROR
+                }
+
+                numbers[i] = result
+                numbers.removeAt(i + 1)
+                operations.removeAt(i)
+            } else {
+                i++
+            }
+        }
+
+        var result = numbers[0]
+        for (i in operations.indices) {
+            val nextNumber = numbers[i + 1]
+            result = when (operations[i]) {
+                "+" -> result + nextNumber
+                "-" -> result - nextNumber
+                else -> return ERROR
+            }
+        }
+
+        return formatResult(result)
+    }
+
+    private fun String.isOperation(): Boolean {
+        return this in Operation.entries.map { it.asString() }
+    }
+
+    private fun formatResult(result: Double): String {
+        return if (result == result.toLong().toDouble()) {
+            result.toLong().toString()
+        } else {
+            result.toString()
+        }
     }
 
     private fun updateCurrentLine() {
-        // TODO
         _state.update {
             it.copy(
                 currentLine = calculationStack.joinToString("")
@@ -222,5 +346,9 @@ class MainViewModel: ViewModel(), CalculatorInteractionListener {
                 lastLine = it.currentLine
             )
         }
+    }
+
+    companion object {
+        private const val ERROR = "Error"
     }
 }

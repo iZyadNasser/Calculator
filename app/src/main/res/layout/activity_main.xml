@@ -56,6 +56,11 @@
 
    </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/gide_line"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/section_calculator"
         android:layout_width="match_parent"
