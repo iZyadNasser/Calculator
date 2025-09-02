@@ -7,3 +7,13 @@ enum class Operation {
     ADDITION,
     SUBTRACTION,
 }
+
+fun Operation.asString(): String {
+    return when (this) {
+        Operation.REMINDER -> "%"
+        Operation.DIVISION -> "/"
+        Operation.MULTIPLICATION -> "x"
+        Operation.ADDITION -> "+"
+        Operation.SUBTRACTION -> "-"
+    }
+}
