@@ -265,15 +265,15 @@ class MainViewModel : ViewModel(), CalculatorInteractionListener {
 
         val parts = expression.split(" ").filter { it.isNotEmpty() }
         if (parts.size == 1) {
-            return formatResult(parts[0].toDoubleOrNull() ?: 0.0)
+            return formatResult(parts[0].toFloatOrNull() ?: 0.0f)
         }
 
-        val numbers = mutableListOf<Double>()
+        val numbers = mutableListOf<Float>()
         val operations = mutableListOf<String>()
 
         for (i in parts.indices) {
             if (i % 2 == 0) {
-                numbers.add(parts[i].toDoubleOrNull() ?: return ERROR)
+                numbers.add(parts[i].toFloatOrNull() ?: return ERROR)
             } else {
                 operations.add(parts[i])
             }
@@ -289,11 +289,11 @@ class MainViewModel : ViewModel(), CalculatorInteractionListener {
                 val result = when (op) {
                     "x" -> left * right
                     "/" -> {
-                        if (right == 0.0) return ERROR
+                        if (right == 0.0f) return ERROR
                         left / right
                     }
                     "%" -> {
-                        if (right == 0.0) return ERROR
+                        if (right == 0.0f) return ERROR
                         left % right
                     }
                     else -> return ERROR
@@ -324,8 +324,8 @@ class MainViewModel : ViewModel(), CalculatorInteractionListener {
         return this in Operation.entries.map { it.asString() }
     }
 
-    private fun formatResult(result: Double): String {
-        return if (result == result.toLong().toDouble()) {
+    private fun formatResult(result: Float): String {
+        return if (result == result.toLong().toFloat()) {
             result.toLong().toString()
         } else {
             result.toString()
